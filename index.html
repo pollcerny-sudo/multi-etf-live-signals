@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Multi-ETF Live Signals & PnL</title>
+<style>body{font-family:Arial;padding:20px;background:#f0f0f0}table{border-collapse:collapse;width:100%;background:#fff;margin-bottom:30px}th,td{border:1px solid #ccc;padding:8px;text-align:center}th{background:#007ACC;color:white}</style>
+</head>
+<body>
+<h1>Multi-ETF Live Signals & PnL</h1>
+<p>Last update: <span id="lastUpdate"></span></p>
+<h2>Last 10 Trades</h2><div id="tableDiv"></div>
+<h2>Current Open Positions (MTM)</h2><div id="positionsDiv"></div>
+<h2>Realized PnL</h2><div id="realizedDiv"></div>
+<script>
+async function loadCSV(){
+    const resp=await fetch('multi_etf_trades.csv');
+    const text=await resp.text();
+    const rows=text.trim().split('\n').map(r=>r.split(','));
+    const idx={}; rows[0].forEach((h,i)=>idx[h]=i);
+    const table=document.createElement('table'); const thead=table.createTHead(); const headerRow=thead.insertRow();
+    rows[0].forEach(h=>headerRow.insertCell().textContent=h);
+    const tbody=table.createTBody();
+    rows.slice(-10).forEach(r=>{const row=tbody.insertRow(); r.forEach(c=>row.insertCell().textContent=c);});
+    document.getElementById('tableDiv').appendChild(table);
+    const tickers=[...new Set(rows.slice(1).map(r=>r[idx["Ticker"]]))]; const prices={};
+    for(const t of tickers){const data=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${t}?interval=1d&range=1d`);
+    const json=await data.json(); prices[t]=json.chart.result[0].meta.regularMarketPrice;}
+    const posTable=document.createElement('table'); const posHead=posTable.createTHead(); const posRow=posHead.insertRow();
+    ["Ticker","Shares","Entry Price","Current Price","MTM USD","MTM %","Pyramids"].forEach(h=>posRow.insertCell().textContent=h);
+    const posBody=posTable.createTBody();
+    tickers.forEach(t=>{const openTrades=rows.slice(1).filter(r=>r[idx["Ticker"]]==t && r[idx["Action"]]=="BUY");
+    if(openTrades.length>0){const lastTrade=openTrades[openTrades.length-1]; const shares=parseFloat(lastTrade[idx["Shares"]]);
+    const entry=parseFloat(lastTrade[idx["Entry_Price"]]); const pyramids=lastTrade[idx["Pyramids"]]; const current=prices[t];
+    const mtmUSD=(current-entry)*shares; const mtmPct=((current-entry)/entry)*100; const row=posBody.insertRow();
+    [t,shares,entry.toFixed(2),current.toFixed(2),mtmUSD.toFixed(2),mtmPct.toFixed(2),pyramids].forEach(c=>row.insertCell().textContent=c);}});
+    document.getElementById('positionsDiv').appendChild(posTable);
+    const realizedTrades=rows.slice(1).filter(r=>r[idx["Action"]]=="SELL");
+    const realTable=document.createElement('table'); const realHead=realTable.createTHead(); const realRow=realHead.insertRow();
+    ["Date","Ticker","Shares","Entry Price","Exit Price","PnL USD","PnL %","Pyramids"].forEach(h=>realRow.insertCell().textContent=h);
+    const realBody=realTable.createTBody();
+    realizedTrades.forEach(r=>{const row=realBody.insertRow();[r[idx["Date"]],r[idx["Ticker"]],r[idx["Shares"]],r[idx["Entry_Price"]],r[idx["Exit_Price"]],r[idx["PnL_USD"]],r[idx["PnL_PCT"]],r[idx["Pyramids"]]].forEach(c=>row.insertCell().textContent=c);});
+    document.getElementById('realizedDiv').appendChild(realTable);
+    document.getElementById('lastUpdate').textContent=new Date().toLocaleString();
+}
+loadCSV();
+</script>
+</body></html>
