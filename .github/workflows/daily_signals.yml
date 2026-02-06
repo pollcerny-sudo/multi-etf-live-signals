@@ -2,7 +2,7 @@ name: Daily Multi-ETF Signals
 
 on:
   schedule:
-    - cron: '0 14 * * *'
+    - cron: '0 16 * * *'
   workflow_dispatch:
 
 jobs:
